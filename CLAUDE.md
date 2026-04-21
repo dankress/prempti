@@ -362,6 +362,8 @@ make build-ctl              # CTL tool only
 
 Requires latest stable Rust (the falco_plugin SDK tracks latest stable as MSRV).
 
+The repository is a Cargo workspace. The root `Cargo.toml` declares `[workspace.package].version` as the single source of truth — every crate inherits it via `version.workspace = true`, the plugin's reported version is derived from `CARGO_PKG_VERSION` at compile time, and `Makefile` / `package.ps1` read the version from the same file. Bumping a release is a one-line change. Size-sensitive crates (`claude-interceptor`, `coding-agents-kit-ctl`) use `opt-level = "z"`; the plugin (hot path) uses `opt-level = 2`.
+
 ### Tests
 
 ```bash
