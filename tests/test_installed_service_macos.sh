@@ -163,7 +163,7 @@ echo "=== ctl ==="
 assert "ctl status exits 0"                "$( bool $? )"
 
 OUT=$("$CTL" mode 2>/dev/null)
-assert "ctl mode reports enforcement"      "$( [[ "$OUT" == "enforcement" ]] && echo 1 || echo 0 )"
+assert "ctl mode reports guardrails"       "$( [[ "$OUT" == "guardrails" ]] && echo 1 || echo 0 )"
 
 "$CTL" health >/dev/null 2>&1
 assert "ctl health exits 0"                "$( bool $? )"

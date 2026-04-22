@@ -77,7 +77,7 @@ impl Broker {
         self.monitor_mode.store(enabled, Ordering::Relaxed);
         log::info!(
             "broker mode: {}",
-            if enabled { "monitor" } else { "enforcement" }
+            if enabled { "monitor" } else { "guardrails" }
         );
     }
 

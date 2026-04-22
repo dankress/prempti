@@ -6,7 +6,7 @@ use falco_plugin::serde::Deserialize;
 #[schemars(crate = "falco_plugin::schemars")]
 #[serde(crate = "falco_plugin::serde")]
 pub struct CodingAgentConfig {
-    /// Operational mode: "enforcement" (default) or "monitor".
+    /// Operational mode: "guardrails" (default) or "monitor".
     /// In monitor mode, rules are evaluated and logged but all verdicts resolve as allow.
     #[serde(default = "default_mode")]
     pub mode: String,
@@ -33,7 +33,7 @@ pub struct CodingAgentConfig {
 }
 
 fn default_mode() -> String {
-    "enforcement".to_string()
+    "guardrails".to_string()
 }
 
 fn default_socket_path() -> String {

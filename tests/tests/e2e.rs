@@ -6,14 +6,14 @@ use cak_tests::interceptor::{assert_decision, assert_reason_contains};
 static HARNESS: OnceLock<Option<E2eHarness>> = OnceLock::new();
 
 fn harness() -> &'static E2eHarness {
-    let opt = HARNESS.get_or_init(|| E2eHarness::start("enforcement"));
+    let opt = HARNESS.get_or_init(|| E2eHarness::start("guardrails"));
     opt.as_ref().expect("falco + plugin required for e2e tests (set FALCO env var)")
 }
 
 /// Returns true if Falco is available. Tests call this to skip gracefully.
 fn falco_available() -> bool {
     HARNESS
-        .get_or_init(|| E2eHarness::start("enforcement"))
+        .get_or_init(|| E2eHarness::start("guardrails"))
         .is_some()
 }
 

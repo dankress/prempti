@@ -265,12 +265,12 @@ fn mode_get(prefix: &PathBuf) {
             return;
         }
     }
-    println!("enforcement");
+    println!("guardrails");
 }
 
 fn mode_set(prefix: &PathBuf, mode: &str) {
-    if mode != "enforcement" && mode != "monitor" {
-        eprintln!("error: mode must be 'enforcement' or 'monitor'");
+    if mode != "guardrails" && mode != "monitor" {
+        eprintln!("error: mode must be 'guardrails' or 'monitor'");
         process::exit(1);
     }
 
@@ -1009,7 +1009,7 @@ fn print_usage() {
     eprintln!("  hook status      Check if the hook is registered");
     eprintln!();
     eprintln!("  mode             Show current operational mode");
-    eprintln!("  mode enforcement Switch to enforcement mode (deny/ask enforced)");
+    eprintln!("  mode guardrails  Switch to guardrails mode (deny/ask enforced)");
     eprintln!("  mode monitor     Switch to monitor mode (all verdicts allow, alerts logged)");
     eprintln!();
     eprintln!("  start            Start the service");

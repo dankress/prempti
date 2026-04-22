@@ -323,7 +323,7 @@ fn write_rules(rules_dir: &Path) {
   tags: [coding_agent_deny]
 
 - rule: Audit read outside cwd
-  desc: Log reads outside working directory (monitor only, no enforcement)
+  desc: Log reads outside working directory (monitor only, no deny/ask)
   condition: tool.name = "Read" and not tool.real_file_path startswith val(agent.real_cwd)
   output: "Falco noticed read outside cwd %tool.real_file_path | correlation=%correlation.id"
   priority: NOTICE

@@ -5,10 +5,10 @@ plugins:
   - name: coding_agent
     library_path: ${HOME}/.coding-agents-kit/share/libcoding_agent.so
     init_config:
-      # Operational mode: "enforcement" (default) or "monitor".
+      # Operational mode: "guardrails" (default) or "monitor".
       # In monitor mode, rules are evaluated and logged but all verdicts resolve as allow.
-      # Changed via: coding-agents-kit-ctl mode <enforcement|monitor>
-      mode: enforcement
+      # Changed via: coding-agents-kit-ctl mode <guardrails|monitor>
+      mode: guardrails
       socket_path: ${HOME}/.coding-agents-kit/run/broker.sock
       http_port: 2802
 

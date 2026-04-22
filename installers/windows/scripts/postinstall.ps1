@@ -76,7 +76,7 @@ plugins:
   - name: coding_agent
     library_path: $($ShareDir -replace '\\', '/')/coding_agent.dll
     init_config:
-      mode: enforcement
+      mode: guardrails
       socket_path: "$($Prefix -replace '\\', '/')/run/broker.sock"
       http_port: 2802
 
