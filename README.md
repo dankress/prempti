@@ -13,19 +13,21 @@
 
 [![asciicast](demo.gif)](https://asciinema.org/a/lXqokxXVO4Q3IH3W)
 
-**coding-agents-kit** brings [Falco](https://falco.org) to the world of AI coding agents. It is designed for developers who use coding agents daily and want visibility, auditability, and pre-execution guardrails for what those agents do on their machines.
+**coding-agents-kit** brings [Falco](https://falco.org) to the world of AI coding agents. It gives you real-time visibility into every tool call your coding agent makes — shell commands, file writes, reads, API calls — and cooperative guardrails that can deny or ask for confirmation on risky actions, evaluated against [Falco rules](https://falco.org/docs/rules/) you can customize.
 
-True to Falco's tradition, the primary goal is **detection**. The kit provides a **monitor mode** that lets you observe every tool call your coding agent makes — shell commands, file writes, reads, API calls — in real time, evaluated against [Falco rules](https://falco.org/docs/rules/) you define. This gives you a clear picture of what the agent is actually doing during a session.
+By default, the kit runs in **guardrails mode**: rules produce verdicts that shape what the agent does. When a tool call is blocked or flagged, the agent receives an LLM-friendly explanation of why and adapts — the policy guides behavior through feedback. If you prefer pure observation without intervention, switch to **monitor mode**: every tool call proceeds while rules still evaluate and log the activity.
 
-Unlike classic Falco, this project operates entirely in user space — no kernel modules, no root, no containers. This makes it easy to run on your development machine but comes with [known limitations](#known-limitations): Falco evaluates tool calls as declared by the agent, not the system calls those commands produce.
+Who is this for? Anyone using a coding agent daily — developers, product managers, designers, vibe coders, and anyone else who wants to see what their agent is doing on their machine and set sensible boundaries for it.
 
-That said, detecting unwanted behavior is still valuable — even at the tool-call level, it helps you catch the unexpected. The kit also provides a **guardrail-style enforcement mode** that relies on the coding agent's own hook API to block or prompt for confirmation before execution. This is strongest when the agent uses structured tools such as file reads and writes, and weaker for generic execution paths such as shell commands or external MCP servers. It is not a substitute for sandboxing, containment, or system hardening — it complements those techniques by adding a policy layer at the agent level.
+### What It Is — and What It Isn't
 
-Ultimately, **coding-agents-kit** is a new way to let Falco and coding agents collaborate, and a foundation for exploring new approaches to protecting your systems against AI-driven threats.
+**It is** a cooperative policy and visibility layer at the tool-call level. It gives you an audit trail of agent activity, and guardrails the agent respects because it sees and understands them.
+
+**It is not** a sandbox, OS-level security, or a substitute for least-privilege environments or system hardening. It does not contain a determined adversarial agent. Use it alongside containment techniques — it complements them, it does not replace them.
 
 ## How It Works
 
-When your coding agent tries to use a tool, **coding-agents-kit** intercepts the call *before* it executes, evaluates it against your security rules, and decides what happens next:
+When your coding agent tries to use a tool, **coding-agents-kit** intercepts the call *before* it executes, evaluates it against your rules, and produces a verdict:
 
 | Verdict | What Happens |
 |---------|-------------|
@@ -33,15 +35,22 @@ When your coding agent tries to use a tool, **coding-agents-kit** intercepts the
 | **Deny** | The tool call is blocked — the agent is told why |
 | **Ask** | You are prompted to approve or reject the call |
 
-Security policies are written as standard [Falco rules](https://falco.org/docs/rules/) in YAML. You get a set of sensible defaults out of the box, and you can add your own rules for your specific needs.
+Rules are standard [Falco rules](https://falco.org/docs/rules/) written in YAML. A sensible default ruleset ships with the kit, and you can add your own to customize behavior for your workflow (see [Custom Rules](#custom-rules)).
 
-`Monitor` mode is useful on its own for visibility, auditing, and tuning rules. `Enforcement` mode adds meaningful friction and policy control before execution, especially for structured file operations and obviously risky actions, but it should be treated as a guardrail layer rather than a hard security boundary.
+### Modes
+
+- **Guardrails mode** (default) — verdicts are enforced: `deny` blocks, `ask` prompts you, `allow` proceeds.
+- **Monitor mode** — all tool calls proceed; verdicts are still evaluated and logged but never act on the agent. Useful for pure observation, auditing, and rule tuning.
+
+Switch between modes at any time with `coding-agents-kit-ctl mode <guardrails|monitor>`.
 
 ## When It Makes Sense
 
-- Good fit when you want to see what the agent is trying to do, add prompts or denials around risky actions, and enforce clear file-access boundaries.
-- Best used alongside sandboxing, system hardening, least-privilege environments, or other containment mechanisms.
-- Not the right tool if you need guarantees about what allowed shell commands, scripts, binaries, or MCP servers will do at runtime.
+- When you want to see what your coding agent is actually doing during a session, without reading every tool call by hand.
+- When you want to set clear boundaries — don't touch `.env` files, don't push to remote, don't write outside the project directory, etc.
+- When you're experimenting with a coding agent and want a safety net against accidental mistakes.
+- When a team wants to standardize how agents behave across members, using shareable YAML rules.
+- Best used alongside sandboxing, system hardening, or least-privilege environments.
 
 ## Quick Start
 
@@ -125,11 +134,11 @@ coding-agents-kit-ctl status
 # Check pipeline health (sends a synthetic event through the full stack)
 coding-agents-kit-ctl health
 
-# Monitor mode — rules evaluate and log, but verdicts are not enforced
-coding-agents-kit-ctl mode monitor
+# Guardrails mode (default) — verdicts are enforced: deny blocks, ask prompts
+coding-agents-kit-ctl mode guardrails
 
-# Enforcement mode (default) — verdicts are enforced
-coding-agents-kit-ctl mode enforcement
+# Monitor mode — all tool calls proceed; verdicts are only logged
+coding-agents-kit-ctl mode monitor
 
 # View live logs
 coding-agents-kit-ctl logs
@@ -175,7 +184,9 @@ The project ships with rules that provide baseline protection:
 
 ## Custom Rules
 
-Add your own rules to `~/.coding-agents-kit/rules/user/`. They are preserved across upgrades.
+The default ruleset is deliberately generic — it catches obviously risky actions that apply to most workflows. For the kit to be genuinely useful, you'll typically want to write your own rules tailored to your specific work: the projects you edit, the remotes you push to, the files you treat as sensitive, the commands you never want your agent to run.
+
+Add your own rules to `~/.coding-agents-kit/rules/user/`. They are preserved across upgrades. You can write them by hand, or use the [rule-authoring skill](#rule-authoring-skill-for-claude-code) to have Claude Code draft and validate them for you interactively.
 
 Example — block piping content to shell interpreters:
 
@@ -359,11 +370,11 @@ Coverage is therefore asymmetric:
 - Weaker for generic tools such as `Bash`, where rules evaluate the declared command rather than fully resolved shell behavior.
 - Input-side only for external systems such as MCP, where the kit can inspect the requested call but not the side effects the MCP server later performs.
 
-In practice, this means enforcement mode can block many unsafe or out-of-policy tool calls, but it is not OS-level containment and should not be treated as a hard boundary. For deeper visibility — detecting what processes actually do at the syscall level — Falco's kernel instrumentation (eBPF/kmod) is the right tool (at least for Linux).
+In practice, guardrails mode can block many unsafe or out-of-policy tool calls, but it is not OS-level containment and should not be treated as a hard boundary. For deeper visibility — detecting what processes actually do at the syscall level — Falco's kernel instrumentation (eBPF/kmod) is the right tool (at least for Linux).
 
 ## Feedback
 
-Runtime security for AI coding agents is new territory — we're learning alongside the community.
+Policy and visibility for AI coding agents is new territory — we're learning alongside the community.
 
 If you're using **coding-agents-kit**, we'd love to hear from you:
 

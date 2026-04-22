@@ -79,7 +79,7 @@ The catch-all seen rule (`seen.yaml`) includes all available fields in its outpu
 The broker passes the rendered message as the verdict reason, prefixed by the rule name: `"Rule Name: <rendered message>"`. So the coding agent sees:
 
 ```
-Deny writing to sensitive paths: Falco blocked writing to /etc/passwd because it is a sensitive path | For AI Agents: inform the user that this action was flagged by a Falco security rule | correlation=%correlation.id
+Deny writing to sensitive paths: Falco blocked writing to /etc/passwd because it is a sensitive path | For AI Agents: inform the user that this action was flagged by a Falco rule | correlation=%correlation.id
 ```
 
 ### Example
@@ -102,5 +102,5 @@ Deny writing to sensitive paths: Falco blocked writing to /etc/passwd because it
 
 - Use `val()` for field-to-field comparisons: `tool.real_file_path startswith val(agent.real_cwd)`
 - Use `basename()` to match file names: `basename(tool.file_path) = ".env"`
-- Use `real_*` fields for security policy matching (resolved paths)
+- Use `real_*` fields for policy matching (resolved paths)
 - Use raw fields (`agent.cwd`, `tool.file_path`) for display and audit

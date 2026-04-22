@@ -190,7 +190,7 @@ The `correlation.id` field is declared with `add_output()` in the plugin's field
 
 Example reason seen by the coding agent:
 ```
-Deny writing to sensitive paths: Falco blocked writing to /etc/passwd because it is a sensitive path | For AI Agents: inform the user that this action was flagged by a Falco security rule | correlation=%correlation.id
+Deny writing to sensitive paths: Falco blocked writing to /etc/passwd because it is a sensitive path | For AI Agents: inform the user that this action was flagged by a Falco rule | correlation=%correlation.id
 ```
 
 ## Configuration
@@ -199,7 +199,7 @@ Plugin config via `falco.yaml` → `init_config`:
 
 ```yaml
 init_config:
-  mode: enforcement        # "enforcement" or "monitor"
+  mode: guardrails         # "guardrails" or "monitor"
   socket_path: ${HOME}/.coding-agents-kit/run/broker.sock   # Linux / macOS
   http_port: 2802
   deny_tags: [coding_agent_deny]
@@ -213,14 +213,14 @@ Windows defaults (rendered by `postinstall.ps1` with absolute paths and forward 
 
 ```yaml
 init_config:
-  mode: enforcement
+  mode: guardrails
   socket_path: C:/Users/<user>/AppData/Local/coding-agents-kit/run/broker.sock
   http_port: 2802
 ```
 
 On startup the plugin refuses to clobber a socket already held by another running instance and refuses to bind an HTTP port already in use — both surface as clean plugin init errors, not panics, so a stray `falco.exe -V ...` cannot take down a running coding-agents-kit service.
 
-Mode switching via `coding-agents-kit-ctl mode <enforcement|monitor>` modifies this file. Falco's `watch_config_files: true` detects the change and performs a full restart (destroy → init).
+Mode switching via `coding-agents-kit-ctl mode <guardrails|monitor>` modifies this file. Falco's `watch_config_files: true` detects the change and performs a full restart (destroy → init).
 
 ## Catch-all Seen Rule
 

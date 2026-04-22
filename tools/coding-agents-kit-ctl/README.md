@@ -24,7 +24,7 @@ coding-agents-kit-ctl hook status    # Check if the hook is registered
 
 ```bash
 coding-agents-kit-ctl mode                # Show current mode
-coding-agents-kit-ctl mode enforcement    # Switch to enforcement (deny/ask enforced)
+coding-agents-kit-ctl mode guardrails     # Switch to guardrails (deny/ask enforced)
 coding-agents-kit-ctl mode monitor        # Switch to monitor (all verdicts allow, alerts logged)
 ```
 

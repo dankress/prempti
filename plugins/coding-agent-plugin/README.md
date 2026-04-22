@@ -46,7 +46,7 @@ Plugin config via `falco.yaml` → `init_config`:
 
 ```yaml
 init_config:
-  mode: enforcement          # "enforcement" or "monitor"
+  mode: guardrails           # "guardrails" or "monitor"
   socket_path: ${HOME}/.coding-agents-kit/run/broker.sock
   http_port: 2802
   deny_tags: [coding_agent_deny]
@@ -56,10 +56,10 @@ init_config:
 
 ## Operational Modes
 
-- **Enforcement** (default): Rules evaluated, verdicts enforced
+- **Guardrails** (default): Rules evaluated, verdicts enforced
 - **Monitor**: Rules evaluated and logged, all verdicts resolve as allow
 
-Switch via `coding-agents-kit-ctl mode <enforcement|monitor>`.
+Switch via `coding-agents-kit-ctl mode <guardrails|monitor>`.
 
 ## Required Falco Configuration
 

@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-**coding-agents-kit** is a runtime security layer for AI coding agents. It intercepts tool calls (shell commands, file writes, web requests, etc.) before execution, evaluates them against Falco security rules, and enforces allow/deny/ask verdicts in real time. It operates entirely in user space with no elevated privileges.
+**coding-agents-kit** is a policy and visibility layer for AI coding agents. It intercepts tool calls (shell commands, file writes, web requests, etc.) before execution, evaluates them against Falco rules, and produces allow/deny/ask verdicts in real time. It operates entirely in user space with no elevated privileges.
+
+It is not a sandbox or OS-level security boundary: at the hook level it only sees what the agent declares, not the runtime side effects of the resulting commands. It is a cooperative policy layer — the agent receives LLM-friendly feedback on blocked or flagged actions and adapts — meant to complement containment techniques, not replace them.
 
 The project targets **Claude Code** on **Linux, macOS, and Windows**. The architecture is designed to accommodate other coding agents (e.g., Codex) in the future.
 
@@ -47,7 +49,7 @@ The project targets **Claude Code** on **Linux, macOS, and Windows**. The archit
 
 The broker is part of the Falco plugin, not a separate process. This reduces moving parts: Falco is the only process the user needs to run (besides the stateless interceptor). The plugin spawns threads for the Unix socket server (accepting interceptor connections) and the HTTP server (receiving Falco alerts).
 
-### Tags for verdict enforcement
+### Tags for verdict resolution
 
 Rule verdicts are encoded in the `tags:` field of Falco rules, not in the `output:` string. The tag names are **configurable in the plugin configuration** and support multiple tags per verdict type. Defaults:
 
@@ -98,7 +100,7 @@ This schema is agent-agnostic. The `agent.name` field distinguishes which coding
 
 Path fields come in raw/real pairs:
 - **Raw** (`agent.cwd`, `tool.file_path`): exactly as reported in the Claude Code hook JSON. Use for display and audit.
-- **Real** (`agent.real_cwd`, `tool.real_file_path`): resolved via `canonicalize` (symlinks resolved, absolute). Falls back to lexical normalization if the path doesn't exist yet (common for Write). Use for security policy matching.
+- **Real** (`agent.real_cwd`, `tool.real_file_path`): resolved via `canonicalize` (symlinks resolved, absolute). Falls back to lexical normalization if the path doesn't exist yet (common for Write). Use for policy matching.
 
 **Rule authoring notes**:
 - When comparing one field against another in Falco rule conditions, use the `val()` transformer. For example: `tool.real_file_path startswith val(agent.real_cwd)`. Without `val()`, the RHS is treated as a literal string, not a field reference.
@@ -106,7 +108,7 @@ Path fields come in raw/real pairs:
 
 ### Rule output convention
 
-The rule `output:` field is an LLM-friendly sentence explaining what happened and why. It must start with "Falco" to attribute the enforcement. Use resolved field values (e.g., `%tool.real_file_path`) to make the message informative. Keep it clean — no structured key=value pairs.
+The rule `output:` field is an LLM-friendly sentence explaining what happened and why. It must start with "Falco" to attribute the verdict. Use resolved field values (e.g., `%tool.real_file_path`) to make the message informative. Keep it clean — no structured key=value pairs.
 
 ```yaml
 output: >
@@ -120,13 +122,13 @@ The `append_output` config appends an instruction for AI agents to every coding_
 append_output:
   - match:
       source: coding_agent
-    extra_output: " | For AI Agents: inform the user that this action was flagged by a Falco security rule | correlation=%correlation.id"
+    extra_output: " | For AI Agents: inform the user that this action was flagged by a Falco rule | correlation=%correlation.id"
 ```
 
 The broker constructs the verdict reason as `"<rule name>: <rendered message>"`. So the coding agent sees:
 
 ```
-Deny writing to sensitive paths: Falco blocked writing to /etc/passwd because it is a sensitive path | For AI Agents: inform the user that this action was flagged by a Falco security rule | correlation=%correlation.id
+Deny writing to sensitive paths: Falco blocked writing to /etc/passwd because it is a sensitive path | For AI Agents: inform the user that this action was flagged by a Falco rule | correlation=%correlation.id
 ```
 
 ### JSON alert format
@@ -154,17 +156,18 @@ Note: Falco's alert delivery is asynchronous — alerts are pushed to an interna
 
 ### Operational modes
 
-Three modes, switchable without reinstallation:
-- **Passthrough** — all tool calls allowed, no rule evaluation.
-- **Monitor** — rules evaluated and logged, but verdicts not enforced.
-- **Enforcement** — verdicts enforced (deny/ask/allow).
+Two plugin modes, switchable without reinstallation via `coding-agents-kit-ctl mode <guardrails|monitor>`:
+- **Guardrails** (default) — verdicts enforced (deny/ask/allow).
+- **Monitor** — rules evaluated and logged, but all verdicts resolve to allow.
+
+Additionally, the interceptor hook can be unregistered via `coding-agents-kit-ctl hook remove`, which passes all tool calls through unmonitored (neither mode is active because the hook isn't firing). This is effectively a "passthrough" state used when the service is intentionally stopped.
 
 ### Fail-safety
 
 - **Fail-closed**: if the plugin/Falco is unreachable, tool calls are denied.
 - No timeout-based fail-safety (see batch-completion design above).
 
-**Important**: When the hook is registered and the service is stopped or restarting (e.g., during config hot-reload), ALL Claude Code tool calls are blocked. This is by design — fail-closed means no enforcement gap. Use `coding-agents-kit-ctl hook remove` to unblock Claude Code when the service is intentionally down. On Linux, the systemd service automatically adds the hook on start and removes it on stop via `ExecStartPost`/`ExecStopPost`. On macOS, the launcher wrapper script (`coding-agents-kit-launcher.sh`) handles this via `trap`.
+**Important**: When the hook is registered and the service is stopped or restarting (e.g., during config hot-reload), ALL Claude Code tool calls are blocked. This is by design — fail-closed means no policy gap. Use `coding-agents-kit-ctl hook remove` to unblock Claude Code when the service is intentionally down. On Linux, the systemd service automatically adds the hook on start and removes it on stop via `ExecStartPost`/`ExecStopPost`. On macOS, the launcher wrapper script (`coding-agents-kit-launcher.sh`) handles this via `trap`.
 
 ### Installation directory structure
 

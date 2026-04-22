@@ -13,7 +13,7 @@ tests/
 │   └── lib.rs              # Re-exports
 ├── tests/
 │   ├── interceptor.rs      # Unit tests against the mock broker
-│   ├── e2e.rs              # End-to-end enforcement-mode tests
+│   ├── e2e.rs              # End-to-end guardrails-mode tests
 │   └── e2e_monitor.rs      # End-to-end monitor-mode tests
 └── test_installed_service_windows.ps1   # Optional post-install smoke test (Windows)
 ```

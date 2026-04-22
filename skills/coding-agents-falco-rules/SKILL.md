@@ -1,6 +1,6 @@
 ---
 name: coding-agents-falco-rules
-description: Author custom Falco rules for coding-agents-kit — the runtime security layer for AI coding agents. Use this skill whenever the user asks to create, edit, or debug rules that control what coding agents (Claude Code, etc.) can do. Triggers on phrases like "add a rule", "block this tool", "deny access to", "allow writes to", "create a security policy", "custom Falco rule for coding agent", or any request to modify files under rules/user/. This skill covers the coding_agent plugin source and its specific fields — NOT syscall rules.
+description: Author custom Falco rules for coding-agents-kit — the policy and visibility layer for AI coding agents. Use this skill whenever the user asks to create, edit, or debug rules that control what coding agents (Claude Code, etc.) can do. Triggers on phrases like "add a rule", "block this tool", "deny access to", "allow writes to", "create a security policy", "custom Falco rule for coding agent", or any request to modify files under rules/user/. This skill covers the coding_agent plugin source and its specific fields — NOT syscall rules.
 ---
 
 # Coding Agents Falco Rules Author
@@ -36,7 +36,7 @@ Every tool call event exposes these fields for conditions and output:
 | `tool.real_file_path` | string | Target file path resolved to absolute canonical path (Write/Edit/Read only) |
 | `tool.mcp_server` | string | MCP server name (MCP tool calls only) |
 
-Path fields come in raw/real pairs. Use `real_*` for security policy matching (resolved, absolute). Use raw fields for display.
+Path fields come in raw/real pairs. Use `real_*` for policy matching (resolved, absolute). Use raw fields for display.
 
 ## Rule Structure
 
@@ -71,7 +71,7 @@ When multiple rules match the same event, verdicts escalate: **deny > ask > allo
 
 The `output:` field is the message the coding agent (or user) sees. Write it as a clear, self-contained sentence:
 
-- Start with "Falco" to attribute the enforcement
+- Start with "Falco" to attribute the verdict
 - Use `%field` to interpolate resolved values (e.g., `%tool.real_file_path`)
 - Do NOT include structured `key=value` pairs — those are handled automatically by `append_output`
 - For **deny** rules: write for an LLM audience (it will rephrase for the user)

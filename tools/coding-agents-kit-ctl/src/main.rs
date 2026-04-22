@@ -922,7 +922,7 @@ fn health(prefix: &PathBuf) {
                 process::exit(1);
             }
 
-            // Denies caused by infrastructure failure (not real security rules)
+            // Denies caused by infrastructure failure (not real rule matches)
             // indicate a broken pipeline. Detect both forms of broker failure:
             // - "broker response timeout": socket connected but no verdict arrived
             // - "broker unavailable": connection refused (service not running)

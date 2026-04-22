@@ -255,7 +255,7 @@ cargo test --manifest-path tests/Cargo.toml --test e2e
 │   ├── falco.yaml                         # Base Falco config
 │   └── falco.coding_agents_plugin.yaml    # Plugin + rules config
 ├── rules\
-│   ├── default\coding_agents_rules.yaml   # Default security rules
+│   ├── default\coding_agents_rules.yaml   # Default ruleset
 │   ├── user\                              # Custom user rules (preserved on upgrade)
 │   └── seen.yaml                          # Catch-all rule (required)
 ├── scripts\

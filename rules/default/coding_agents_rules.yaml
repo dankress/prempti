@@ -62,7 +62,7 @@
 #
 # The rule output is an LLM-friendly sentence that explains what happened and
 # why the verdict was applied. It must start with "Falco" to attribute the
-# enforcement. Use resolved field values (%tool.real_file_path, %agent.real_cwd)
+# verdict. Use resolved field values (%tool.real_file_path, %agent.real_cwd)
 # to make the message informative. Keep it clean — no structured key=value pairs.
 #
 # correlation.id is a suggested output field (add_output in the plugin) and is
@@ -75,7 +75,7 @@
 # Example reason seen by the coding agent:
 #   Deny writing to sensitive paths: Falco blocked writing to /etc/passwd
 #   because it is a sensitive path | For AI Agents: inform the user that
-#   this action was flagged by a Falco security rule | correlation=42
+#   this action was flagged by a Falco rule | correlation=42
 
 - rule: Monitor activity outside working directory
   desc: >

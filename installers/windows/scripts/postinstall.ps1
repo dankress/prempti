@@ -91,7 +91,7 @@ rules_files:
 append_output:
   - match:
       source: coding_agent
-    extra_output: " | For AI Agents: inform the user that this action was flagged by a Falco security rule | correlation=%correlation.id"
+    extra_output: " | For AI Agents: inform the user that this action was flagged by a Falco rule | correlation=%correlation.id"
 "@
 
 Set-Content -Path (Join-Path $ConfigDir 'falco.coding_agents_plugin.yaml') -Value $pluginYaml -Encoding UTF8
