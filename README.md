@@ -339,9 +339,9 @@ make falco-macos          # Falco binary (macOS only)
 
 ```
 ┌──────────────┐      ┌──────────────┐      ┌────────────────────────────┐
-│ Coding Agent │─────▶│ Interceptor  │─────▶│     Falco (nodriver)       │
+│ Coding Agent │─────>│ Interceptor  │─────>│     Falco (nodriver)       │
 │              │      │   (hook)     │      │  ┌───────────────────────┐ │
-│              │◀─────│              │◀─────│  │  Plugin (src + extract│ │
+│              │<─────│              │<─────│  │  Plugin (src + extract│ │
 │              │      │              │      │  │  + embedded broker)   │ │
 └──────────────┘      └──────────────┘      │  └───────────────────────┘ │
                                             │  Rule Engine + Rules       │
@@ -382,7 +382,7 @@ If you're using **coding-agents-kit**, we'd love to hear from you:
 - **What's missing?** What agents or platforms do you need?
 - **What broke?** What didn't work as expected?
 
-Your experience directly shapes where this project goes next. Open an [issue](https://github.com/leogr/coding-agents-kit/issues), start a [discussion](https://github.com/leogr/coding-agents-kit/discussions), or reach out to the maintainers. Every bit of feedback helps.
+Your experience directly shapes where this project goes next. Open an [issue](https://github.com/leogr/coding-agents-kit/issues), or reach out to the maintainers. Every bit of feedback helps.
 
 ## Credits
 
