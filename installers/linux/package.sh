@@ -46,15 +46,15 @@ esac
 if [[ "$ARCH" == "$HOST_ARCH" ]]; then
     # Native build — no cross-compilation flags needed.
     CARGO_TARGET_FLAG=""
-    INTERCEPTOR_BIN="hooks/claude-code/target/release/claude-interceptor"
-    PLUGIN_LIB="plugins/coding-agent-plugin/target/release/libcoding_agent.so"
-    CTL_BIN="tools/coding-agents-kit-ctl/target/release/coding-agents-kit-ctl"
+    INTERCEPTOR_BIN="target/release/claude-interceptor"
+    PLUGIN_LIB="target/release/libcoding_agent.so"
+    CTL_BIN="target/release/coding-agents-kit-ctl"
 else
     # Cross-compilation.
     CARGO_TARGET_FLAG="--target $RUST_TARGET"
-    INTERCEPTOR_BIN="hooks/claude-code/target/$RUST_TARGET/release/claude-interceptor"
-    PLUGIN_LIB="plugins/coding-agent-plugin/target/$RUST_TARGET/release/libcoding_agent.so"
-    CTL_BIN="tools/coding-agents-kit-ctl/target/$RUST_TARGET/release/coding-agents-kit-ctl"
+    INTERCEPTOR_BIN="target/$RUST_TARGET/release/claude-interceptor"
+    PLUGIN_LIB="target/$RUST_TARGET/release/libcoding_agent.so"
+    CTL_BIN="target/$RUST_TARGET/release/coding-agents-kit-ctl"
 fi
 
 PACKAGE_NAME="coding-agents-kit-${VERSION}-linux-${ARCH}"
