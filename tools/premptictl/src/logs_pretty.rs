@@ -223,6 +223,35 @@ fn condense_session_name(text: &str) -> String {
     }
 }
 
+/// Flatten a multi-line tool input to a single line: replace control chars
+/// with spaces, collapse runs of whitespace, and trim. Used for the inline
+/// body of `Allow`/`Seen` events where the column layout requires a single
+/// line per event.
+fn flatten_inline(text: &str) -> String {
+    let cleaned: String = text
+        .chars()
+        .map(|c| match c {
+            '\n' | '\r' | '\t' => ' ',
+            c if (c as u32) < 0x20 => ' ',
+            c => c,
+        })
+        .collect();
+    let mut out = String::with_capacity(cleaned.len());
+    let mut prev_space = false;
+    for c in cleaned.chars() {
+        if c == ' ' {
+            if !prev_space {
+                out.push(' ');
+            }
+            prev_space = true;
+        } else {
+            out.push(c);
+            prev_space = false;
+        }
+    }
+    out.trim().to_string()
+}
+
 fn take_chars(s: &str, max: usize) -> String {
     s.chars().take(max).collect()
 }
@@ -475,9 +504,9 @@ impl<R: SessionNameResolver> Formatter<R> {
         }
 
         if render_verdict {
-            let (event_line, body_col) =
+            let (event_lines, body_col) =
                 self.format_event_line(&time_str, &session_id, color_code, final_v, fields);
-            out.push(event_line);
+            out.extend(event_lines);
             for va in buf.verdicts.iter() {
                 if (va.kind == VerdictKind::Deny && final_v == FinalVerdict::Deny)
                     || (va.kind == VerdictKind::Ask && final_v == FinalVerdict::Ask)
@@ -538,10 +567,16 @@ impl<R: SessionNameResolver> Formatter<R> {
         )
     }
 
-    /// Format the event line and return its body column (1-indexed-ish:
+    /// Format the event lines and return the body column (1-indexed-ish:
     /// the visible width of the prefix `time + ws + label + ws + bullet +
     /// ws`). The caller uses that width as left padding for sub-lines so
     /// the rule name aligns under the tool name.
+    ///
+    /// For `Allow` verdicts the result is a single line with a truncated
+    /// body, matching the streaming-friendly default. For `Deny` and `Ask`
+    /// the tool name lands on the event line and the full untruncated
+    /// content is emitted on subsequent lines, indented to the body column
+    /// behind a dim `│` rule so the audit block stays visually distinct.
     fn format_event_line(
         &self,
         time_str: &str,
@@ -549,19 +584,41 @@ impl<R: SessionNameResolver> Formatter<R> {
         color_code: u8,
         verdict: FinalVerdict,
         fields: Option<&Value>,
-    ) -> (String, usize) {
+    ) -> (Vec<String>, usize) {
         let bullet = self.paint(verdict_bullet(verdict), verdict_color(verdict));
         let (label, label_w) = self.format_session_label(session_id, color_code);
-        let body = self.render_tool_body(fields);
-        let line = format!(
-            "{time}  {label}  {bullet}  {body}",
+        let body_col = display_width(time_str) + 2 + label_w + 2 + 1 + 2;
+        let prefix = format!(
+            "{time}  {label}  {bullet}  ",
             time = self.paint(time_str, ANSI_DIM),
             label = label,
             bullet = bullet,
-            body = body,
         );
-        let body_col = display_width(time_str) + 2 + label_w + 2 + 1 + 2;
-        (line, body_col)
+
+        match verdict {
+            FinalVerdict::Allow => {
+                let body = self.render_tool_body(fields);
+                (vec![format!("{prefix}{body}")], body_col)
+            }
+            FinalVerdict::Deny | FinalVerdict::Ask => {
+                let tool = field_str(fields, "tool.name").unwrap_or_else(|| "?".to_string());
+                let tool_styled = self.paint(&tool, ANSI_BOLD);
+                let mut lines = vec![format!("{prefix}{tool_styled}")];
+                let content = self.tool_full_content(&tool, fields);
+                if !content.is_empty() {
+                    let pad = " ".repeat(body_col);
+                    let rule = self.paint("│", ANSI_DIM);
+                    for content_line in content.lines() {
+                        if content_line.is_empty() {
+                            lines.push(format!("{pad}{rule}"));
+                        } else {
+                            lines.push(format!("{pad}{rule} {content_line}"));
+                        }
+                    }
+                }
+                (lines, body_col)
+            }
+        }
     }
 
     fn format_seen_event_line(
@@ -678,7 +735,38 @@ impl<R: SessionNameResolver> Formatter<R> {
                 .unwrap_or_default(),
             _ => stringify_input(fields).unwrap_or_default(),
         };
-        truncate_for_display(&raw, max)
+        truncate_for_display(&flatten_inline(&raw), max)
+    }
+
+    /// Same content sources as [`Self::tool_body_content`], but without
+    /// length truncation. Path tools still get the home-directory tilde
+    /// substitution applied for readability.
+    fn tool_full_content(&self, tool: &str, fields: Option<&Value>) -> String {
+        match tool {
+            "Bash" => field_str(fields, "tool.input_command")
+                .or_else(|| input_value_string(fields, "command"))
+                .unwrap_or_default(),
+            "Read" | "Edit" | "Write" => {
+                let p = field_str(fields, "tool.real_file_path")
+                    .filter(|s| !s.is_empty())
+                    .or_else(|| field_str(fields, "tool.file_path"))
+                    .or_else(|| input_value_string(fields, "file_path"))
+                    .unwrap_or_default();
+                shorten_path(&p, &self.home, usize::MAX)
+            }
+            "Grep" => input_value_string(fields, "pattern")
+                .or_else(|| stringify_input(fields))
+                .unwrap_or_default(),
+            "Glob" => input_value_string(fields, "pattern")
+                .or_else(|| stringify_input(fields))
+                .unwrap_or_default(),
+            "WebFetch" => input_value_string(fields, "url").unwrap_or_default(),
+            "WebSearch" => input_value_string(fields, "query").unwrap_or_default(),
+            "Task" | "Agent" => input_value_string(fields, "description")
+                .or_else(|| input_value_string(fields, "prompt"))
+                .unwrap_or_default(),
+            _ => stringify_input(fields).unwrap_or_default(),
+        }
     }
 
     /// Footer shown at the bottom of the output: blank line, grey rule, and
@@ -1317,7 +1405,11 @@ mod tests {
         let out2 = f.process_line(&seen);
         let joined = out2.join("\n");
         assert!(joined.contains("⊘"), "deny bullet expected: {joined}");
-        assert!(joined.contains("Bash(rm -rf /)"));
+        assert!(joined.contains("Bash"), "tool name on event line: {joined}");
+        assert!(
+            joined.contains("│ rm -rf /"),
+            "command on continuation line: {joined}"
+        );
         assert!(joined.contains("CRITICAL  Deny dangerous"));
         let c = f.counters();
         assert_eq!(c.deny, 1);
@@ -1361,7 +1453,11 @@ mod tests {
         let joined = out.join("\n");
         assert!(joined.contains("⊙"));
         assert!(joined.contains("WARNING  Sensitive write"));
-        assert!(joined.contains("Edit(/etc/passwd)"));
+        assert!(joined.contains("Edit"), "tool name on event line: {joined}");
+        assert!(
+            joined.contains("│ /etc/passwd"),
+            "path on continuation line: {joined}"
+        );
         assert_eq!(f.counters().ask, 1);
     }
 
