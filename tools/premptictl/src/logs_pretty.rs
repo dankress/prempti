@@ -528,7 +528,7 @@ impl<R: SessionNameResolver> Formatter<R> {
     ) -> String {
         let abbrev = shorten_path(cwd, &self.home, 60);
         let (label, _) = self.format_session_label(session_id, color_code);
-        let arrow = self.paint("▸", ANSI_DIM);
+        let arrow = self.paint("❯", ANSI_DIM);
         format!(
             "{time}  {label}  {arrow} {path}",
             time = self.paint(time_str, ANSI_DIM),
@@ -604,30 +604,42 @@ impl<R: SessionNameResolver> Formatter<R> {
     /// column for sub-line alignment without re-stripping ANSI.
     fn format_session_label(&self, session_id: &str, color_code: u8) -> (String, usize) {
         const TITLE_MAX_CHARS: usize = 24;
+        // '[' + 8-char sid + ']' + ' ' + (24 + '…') = 36 chars.
+        // Pad shorter labels to this width so per-line columns align across sessions.
+        const LABEL_TARGET_WIDTH: usize = 36;
         let sid = short_session_id(session_id);
         let title = self
             .sessions
             .get(session_id)
             .and_then(|s| s.last_title.as_deref())
             .filter(|t| !t.is_empty());
-        let mut visible = String::with_capacity(sid.len() + 32);
-        visible.push('[');
-        visible.push_str(&sid);
+
+        let id_part = format!("[{sid}]");
+        let id_painted = self.paint(&id_part, &session_color_code(color_code));
+
+        let mut title_part = String::new();
         if let Some(t) = title {
             let total = t.chars().count();
-            visible.push_str(" · \"");
+            title_part.push(' ');
             if total > TITLE_MAX_CHARS {
-                visible.push_str(&take_chars(t, TITLE_MAX_CHARS));
-                visible.push('…');
+                title_part.push_str(&take_chars(t, TITLE_MAX_CHARS));
+                title_part.push('…');
             } else {
-                visible.push_str(t);
+                title_part.push_str(t);
             }
-            visible.push('"');
         }
-        visible.push(']');
-        let width = visible.chars().count();
-        let painted = self.paint(&visible, &session_color_code(color_code));
-        (painted, width)
+        let title_painted = if title_part.is_empty() {
+            String::new()
+        } else {
+            self.paint(&title_part, ANSI_DIM)
+        };
+
+        let visible_width = id_part.chars().count() + title_part.chars().count();
+        let pad_n = LABEL_TARGET_WIDTH.saturating_sub(visible_width);
+        let final_width = visible_width + pad_n;
+        let pad = " ".repeat(pad_n);
+
+        (format!("{id_painted}{title_painted}{pad}"), final_width)
     }
 
     fn render_tool_body(&self, fields: Option<&Value>) -> String {
@@ -1050,7 +1062,8 @@ fn format_since(unix_ms: u64) -> Option<String> {
 
 fn pick_session_color(session_id: &str) -> u8 {
     // Curated 256-color palette: skip red/green/yellow used for verdicts.
-    const PALETTE: [u8; 8] = [33, 39, 45, 81, 99, 141, 177, 213];
+    // Spread across blue → cyan → purple → magenta → pink for visual variety.
+    const PALETTE: [u8; 12] = [27, 33, 39, 45, 51, 87, 99, 135, 141, 165, 177, 213];
     let mut hash: u64 = 0xcbf29ce484222325; // FNV-1a 64-bit offset basis
     for byte in session_id.bytes() {
         hash ^= u64::from(byte);
@@ -1365,9 +1378,9 @@ mod tests {
         let joined1 = out1.join("\n");
         let joined2 = out2.join("\n");
         let joined3 = out3.join("\n");
-        assert!(joined1.contains("▸ ~/a"), "first event has cwd: {joined1}");
-        assert!(!joined2.contains("▸"), "same cwd → no cwd line: {joined2}");
-        assert!(joined3.contains("▸ ~/b"), "cwd changed → emit: {joined3}");
+        assert!(joined1.contains("❯ ~/a"), "first event has cwd: {joined1}");
+        assert!(!joined2.contains("❯"), "same cwd → no cwd line: {joined2}");
+        assert!(joined3.contains("❯ ~/b"), "cwd changed → emit: {joined3}");
     }
 
     #[test]
@@ -1388,7 +1401,7 @@ mod tests {
         let joined = out.join("\n");
         assert!(joined.contains("── abc"), "banner expected: {joined}");
         assert!(joined.contains("[abc]"), "label in event line: {joined}");
-        assert!(joined.contains("▸ ~/proj"));
+        assert!(joined.contains("❯ ~/proj"));
     }
 
     #[test]
@@ -1408,13 +1421,13 @@ mod tests {
         ));
         let cwd_line = out
             .iter()
-            .find(|l| l.contains("▸"))
+            .find(|l| l.contains("❯"))
             .expect("cwd line present");
-        // time appears in the same line as ▸ and the [label].
+        // time appears in the same line as ❯ and the [label].
         assert!(cwd_line.contains("[abc]"), "label on cwd line: {cwd_line}");
-        assert!(cwd_line.contains("▸ ~/proj"), "path follows ▸: {cwd_line}");
+        assert!(cwd_line.contains("❯ ~/proj"), "path follows ❯: {cwd_line}");
         // The cwd line precedes the event line.
-        let cwd_idx = out.iter().position(|l| l.contains("▸")).unwrap();
+        let cwd_idx = out.iter().position(|l| l.contains("❯")).unwrap();
         let evt_idx = out.iter().position(|l| l.contains("●")).unwrap();
         assert!(cwd_idx < evt_idx);
     }
@@ -1597,7 +1610,7 @@ mod tests {
         let out = f.process_line(&raw);
         let joined = out.join("\n");
         assert!(
-            joined.contains("[ea56c92a · \"prettify ctl\"]"),
+            joined.contains("[ea56c92a] prettify ctl"),
             "label missing title: {joined}"
         );
     }
@@ -1617,9 +1630,13 @@ mod tests {
             joined.contains("[ea56c92a]"),
             "expected bare label when no title: {joined}"
         );
+        // No title resolved → after the id we should see only padding (spaces),
+        // never any non-space character before the bullet/❯ marker.
+        let after = joined.split_once("[ea56c92a]").unwrap().1;
+        let next_char = after.chars().find(|c| !c.is_whitespace()).unwrap_or(' ');
         assert!(
-            !joined.contains("[ea56c92a ·"),
-            "no `· \"...\"` when title unknown: {joined}"
+            "❯●⊙⊘".contains(next_char),
+            "first non-space after [id] should be a marker, got {next_char:?}: {joined}"
         );
     }
 
