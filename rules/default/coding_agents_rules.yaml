@@ -100,13 +100,19 @@
 # operation-level granularity can still pattern-match on tool.patch_op
 # directly (e.g. `tool.patch_op = "Delete" and tool.real_file_path …`).
 - macro: is_claude_write_tool
-  condition: tool.name in ("Write", "Edit", "create", "edit")
+  condition: tool.name in ("Write", "Edit")
 
 - macro: is_codex_patch_write
   condition: tool.name = "apply_patch" and tool.patch_op in ("Add", "Update", "Delete", "Move")
 
+- macro: is_copilot_write_tool
+  condition: tool.name in ("create", "edit")
+
+- macro: is_copilot_patch_write
+  condition: tool.name = "apply_patch" and tool.patch_op in ("Add", "Update", "Delete", "Move")
+
 - macro: is_write_tool
-  condition: is_claude_write_tool or is_codex_patch_write
+  condition: is_claude_write_tool or is_codex_patch_write or is_copilot_write_tool or is_copilot_patch_write
 
 # Extensible macro: each line is an "or" condition.
 # Users can append custom sensitive paths via override:
