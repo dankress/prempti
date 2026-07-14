@@ -738,6 +738,7 @@
 
 - macro: is_bash
   condition: tool.name = "Bash"
+  condition: tool.name in ("Bash", "bash")
 
 - macro: references_credential
   condition: >
@@ -1950,7 +1951,7 @@
 # tool with shell redirection bypasses that check entirely.
 - macro: is_bash_commands_write
   condition: >
-    tool.name = "Bash"
+    is_bash
     and tool.input_command contains "/.claude/commands/"
 
 # Rules
@@ -2285,7 +2286,7 @@
 # Rule 3 catches Write/Edit tool calls; shell redirection via Bash bypasses it.
 - macro: is_bash_git_hooks_write
   condition: >
-    tool.name = "Bash"
+    is_bash
     and tool.input_command contains "/.git/hooks/"
 
 # Macros: package registry redirect
