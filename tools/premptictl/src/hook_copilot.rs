@@ -346,6 +346,8 @@ pub fn cli_add(prefix: &Path) {
 }
 
 pub fn cli_remove(prefix: &Path) {
+    // Drop the marker first so a racing supervisor start can't re-assert
+    // the JSON hook between our two operations.
     if let Err(e) = mark_disabled(prefix) {
         eprintln!("warning: failed to remove enable marker: {e}");
     }
