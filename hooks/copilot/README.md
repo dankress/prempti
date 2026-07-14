@@ -107,11 +107,11 @@ Register the interceptor with:
 premptictl hook add copilot
 ```
 
-This writes a `~/.copilot/hooks.json` file — or installs individual `.json` manifests in `~/.copilot/hooks/` — that mounts the packaged `copilot-interceptor` binary on both `preToolUse` and `permissionRequest` (matcher `.*`, 30s timeout). Remove with `premptictl hook remove copilot`; status with `premptictl hook status copilot`.
+This writes a `~/.copilot/hooks/prempti.json` file that mounts the packaged `copilot-interceptor` binary on both `preToolUse` and `permissionRequest` (matcher `.*`, 30s timeout). Remove with `premptictl hook remove copilot`; status with `premptictl hook status copilot`.
 
 The hook remains opt-in. Once enabled, the Prempti supervisor manages its lifecycle alongside the Claude Code and Codex hooks: it re-asserts the hook configuration on service start and removes it on service stop so Copilot does not fail closed against a dead broker. The opt-in marker remains until `premptictl hook remove copilot`.
 
-If you'd rather hand-roll the config — for example to bind it to a specific tool matcher or to combine with hooks you already have — the canonical shape for `~/.copilot/hooks.json` is:
+If you'd rather hand-roll the config — for example to bind it to a specific tool matcher or to combine with hooks you already have — the canonical shape for `~/.copilot/hooks/prempti.json` is:
 
 ```json
 {
@@ -137,7 +137,6 @@ If you'd rather hand-roll the config — for example to bind it to a specific to
 }
 ```
 
-You can also place the config as an inline `hooks` block in `~/.copilot/settings.json` or `.github/copilot/settings.local.json` per repository.
 
 ## Configuration
 
