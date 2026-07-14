@@ -67,7 +67,7 @@
 
 # Agent instruction files that other coding agents read as prompt context.
 - list: agent_instruction_files
-  items: [.cursorrules, .windsurfrules, .aiderrules, AGENTS.md, .copilotrules]
+  items: [.cursorrules, .windsurfrules, .aiderrules, AGENTS.md]
 
 # Environment variable files commonly sourced by shells, frameworks, and CI.
 - list: env_file_names
@@ -262,7 +262,7 @@
     Falco blocked reading %tool.real_file_path because it is a sensitive path
   priority: CRITICAL
   source: coding_agent
-  tags: [coding_agent_deny]
+  tags: [coding_agent_deny, mitre_t1552_unsecured_credentials]
 
 - rule: Deny writing to sensitive paths
   desc: >
@@ -744,6 +744,10 @@
     or tool.input_command contains "/.netrc"
     or tool.input_command contains "/.npmrc"
     or tool.input_command contains "/.docker/config.json"
+    or tool.input_command contains "/.kube/"
+    or tool.input_command contains "/.azure/"
+    or tool.input_command contains "/.config/gcloud/"
+    or tool.input_command contains "/.git-credentials"
     or tool.input_command contains "credentials.json"
     or tool.input_command contains "AWS_SECRET_ACCESS_KEY"
     or tool.input_command contains "GITHUB_TOKEN"
@@ -1201,7 +1205,7 @@
     Falco blocked a Bash command referencing a credential path or secret token (%tool.input_command)
   priority: CRITICAL
   source: coding_agent
-  tags: [coding_agent_deny]
+  tags: [coding_agent_deny, mitre_t1552_unsecured_credentials]
 
 - rule: Deny credential file access via Read tool
   desc: >
@@ -1217,7 +1221,7 @@
     Falco blocked the Read tool accessing a credential file at %tool.real_file_path
   priority: CRITICAL
   source: coding_agent
-  tags: [coding_agent_deny]
+  tags: [coding_agent_deny, mitre_t1552_unsecured_credentials]
 
 - rule: Deny destructive system commands
   desc: >
@@ -1231,7 +1235,7 @@
     Falco blocked a destructive system command (%tool.input_command)
   priority: CRITICAL
   source: coding_agent
-  tags: [coding_agent_deny]
+  tags: [coding_agent_deny, mitre_t1485_data_destruction]
 
 - rule: Ask before potentially destructive shell commands
   desc: >
@@ -1247,7 +1251,7 @@
     Falco requires confirmation before a potentially destructive shell command (%tool.input_command)
   priority: WARNING
   source: coding_agent
-  tags: [coding_agent_ask]
+  tags: [coding_agent_ask, mitre_t1485_data_destruction]
 
 - rule: Ask before container privilege escalation or host breakout
   desc: >
@@ -1281,7 +1285,7 @@
     Falco blocked piping content to a shell interpreter (%tool.input_command)
   priority: CRITICAL
   source: coding_agent
-  tags: [coding_agent_deny]
+  tags: [coding_agent_deny, mitre_t1059_command_and_scripting_interpreter, mitre_t1105_ingress_tool_transfer]
 
 - rule: Deny encoded payload execution
   desc: >
@@ -1293,7 +1297,7 @@
     Falco blocked execution of a potentially encoded or inline-interpreted payload (%tool.input_command)
   priority: CRITICAL
   source: coding_agent
-  tags: [coding_agent_deny]
+  tags: [coding_agent_deny, mitre_t1027_obfuscated_files_or_information, mitre_t1140_deobfuscate_decode_files_or_information]
 
 - rule: Deny curl wget exfiltration
   desc: >
@@ -1305,7 +1309,7 @@
     Falco blocked a potential data exfiltration command via curl or wget (%tool.input_command)
   priority: CRITICAL
   source: coding_agent
-  tags: [coding_agent_deny]
+  tags: [coding_agent_deny, AML.T0025_exfiltration_via_cyber_means, mitre_t1567_exfiltration_over_web_service]
 
 - rule: Ask before writing to tmp staging paths
   desc: >
@@ -1324,7 +1328,7 @@
     Falco requires confirmation before writing to the staging path %tool.real_file_path
   priority: WARNING
   source: coding_agent
-  tags: [coding_agent_ask]
+  tags: [coding_agent_ask, mitre_t1074_data_staged]
 
 - rule: Deny reverse shell via Bash
   desc: >
@@ -1336,7 +1340,7 @@
     Falco blocked a reverse shell command (%tool.input_command)
   priority: CRITICAL
   source: coding_agent
-  tags: [coding_agent_deny]
+  tags: [coding_agent_deny, mitre_t1059_command_and_scripting_interpreter]
 
 - rule: Deny cloud metadata service access via Bash
   desc: >
@@ -1349,7 +1353,7 @@
     Falco blocked access to a cloud metadata service (%tool.input_command)
   priority: CRITICAL
   source: coding_agent
-  tags: [coding_agent_deny]
+  tags: [coding_agent_deny, mitre_t1552.005_cloud_instance_metadata_api]
 
 - rule: Deny credential directory archive via Bash
   desc: >
@@ -1361,7 +1365,7 @@
     Falco blocked archiving a credential directory (%tool.input_command)
   priority: CRITICAL
   source: coding_agent
-  tags: [coding_agent_deny]
+  tags: [coding_agent_deny, mitre_t1560_archive_collected_data, mitre_t1552_unsecured_credentials]
 
 - rule: Deny SSH reverse tunnel and SOCKS proxy
   desc: >
@@ -1374,7 +1378,7 @@
     Falco blocked an SSH tunneling or proxy command (%tool.input_command)
   priority: CRITICAL
   source: coding_agent
-  tags: [coding_agent_deny]
+  tags: [coding_agent_deny, mitre_t1572_protocol_tunneling]
 
 - rule: Ask before cron and scheduled task manipulation
   desc: >
@@ -1387,7 +1391,7 @@
     Falco requires confirmation before modifying cron configuration (%tool.input_command)
   priority: WARNING
   source: coding_agent
-  tags: [coding_agent_ask]
+  tags: [coding_agent_ask, mitre_t1053_scheduled_task_job]
 
 - rule: Deny audit trail destruction
   desc: >
@@ -1400,7 +1404,7 @@
     Falco blocked a shell history wipe attempt (%tool.input_command)
   priority: CRITICAL
   source: coding_agent
-  tags: [coding_agent_deny]
+  tags: [coding_agent_deny, mitre_t1070_indicator_removal]
 
 - rule: Deny package publish
   desc: >
@@ -1413,7 +1417,7 @@
     Falco blocked a package publish command (%tool.input_command)
   priority: CRITICAL
   source: coding_agent
-  tags: [coding_agent_deny]
+  tags: [coding_agent_deny, AML.T0010_ml_supply_chain_compromise, mitre_t1195_supply_chain_compromise]
 
 - rule: Ask before modifying shell startup files
   desc: >
@@ -1429,7 +1433,7 @@
     Falco requires confirmation before modifying shell startup file %tool.real_file_path
   priority: WARNING
   source: coding_agent
-  tags: [coding_agent_ask]
+  tags: [coding_agent_ask, mitre_t1546.004_unix_shell_configuration_modification]
 
 - rule: Ask before writing agent instruction files outside working directory
   desc: >
@@ -1447,7 +1451,7 @@
     Falco requires confirmation before writing agent instruction file %tool.real_file_path outside working directory %agent.real_cwd
   priority: WARNING
   source: coding_agent
-  tags: [coding_agent_ask]
+  tags: [coding_agent_ask, AML.T0051_llm_prompt_injection]
 
 - rule: Deny cross-agent authentication file access
   desc: >
@@ -1460,7 +1464,7 @@
     Falco blocked %agent.name from reading another agent's authentication file %tool.real_file_path
   priority: CRITICAL
   source: coding_agent
-  tags: [coding_agent_deny]
+  tags: [coding_agent_deny, mitre_t1552_unsecured_credentials]
 
 - rule: Deny MCP server or skill install from untrusted host
   desc: >
@@ -1473,7 +1477,7 @@
     Falco blocked installing a package or skill from an untrusted host (%tool.input_command)
   priority: CRITICAL
   source: coding_agent
-  tags: [coding_agent_deny]
+  tags: [coding_agent_deny, AML.T0010_ml_supply_chain_compromise, AML.T0048_llm_plugin_compromise]
 
 - rule: Deny MCP server execution from temporary directory
   desc: >
@@ -1486,7 +1490,7 @@
     Falco blocked executing a potential MCP server from a temporary directory (%tool.input_command)
   priority: CRITICAL
   source: coding_agent
-  tags: [coding_agent_deny]
+  tags: [coding_agent_deny, AML.T0048_llm_plugin_compromise]
 
 - rule: Ask before Glob with credential directory patterns
   desc: >
@@ -1500,7 +1504,7 @@
     Falco requires confirmation before globbing with a credential-targeting pattern (%tool.input)
   priority: WARNING
   source: coding_agent
-  tags: [coding_agent_ask]
+  tags: [coding_agent_ask, mitre_t1552_unsecured_credentials]
 
 # ===========================================================================
 # Section 4b — Copilot CLI tool-specific threats
@@ -2209,7 +2213,7 @@
     Falco requires confirmation before writing to Claude Code settings backups at %tool.real_file_path
   priority: WARNING
   source: coding_agent
-  tags: [coding_agent_ask, prempti_self_protection]
+  tags: [coding_agent_ask, prempti_self_protection, mitre_t1562.001_impair_defenses_disable_or_modify_tools]
 
 # ===========================================================================
 # Section 6 — Persistence vectors
@@ -2574,7 +2578,7 @@
     Falco blocked an agent invocation of the premptictl CLI (%tool.input_command)
   priority: CRITICAL
   source: coding_agent
-  tags: [coding_agent_deny, prempti_self_protection]
+  tags: [coding_agent_deny, prempti_self_protection, mitre_t1562.001_impair_defenses_disable_or_modify_tools]
 
 - macro: is_service_stop_linux
   condition: >
@@ -2632,7 +2636,7 @@
     Falco blocked a platform service-stop command targeting Prempti (%tool.input_command)
   priority: CRITICAL
   source: coding_agent
-  tags: [coding_agent_deny, prempti_self_protection]
+  tags: [coding_agent_deny, prempti_self_protection, mitre_t1562.001_impair_defenses_disable_or_modify_tools]
 
 - macro: is_prempti_install_path
   condition: >
@@ -2665,7 +2669,7 @@
     Falco blocked writing to %tool.real_file_path under the Prempti install prefix
   priority: CRITICAL
   source: coding_agent
-  tags: [coding_agent_deny, prempti_self_protection]
+  tags: [coding_agent_deny, prempti_self_protection, mitre_t1562.001_impair_defenses_disable_or_modify_tools]
 
 # Bash redirections to the Prempti install prefix.
 - rule: Deny writes under Prempti install prefix via Bash
@@ -2694,7 +2698,7 @@
     Falco blocked writing to Claude Code settings at %tool.real_file_path
   priority: CRITICAL
   source: coding_agent
-  tags: [coding_agent_deny, prempti_self_protection]
+  tags: [coding_agent_deny, prempti_self_protection, mitre_t1562.001_impair_defenses_disable_or_modify_tools]
 
 - rule: Deny writes to Claude Code policy limits file
   desc: >
@@ -2713,7 +2717,7 @@
     Falco blocked writing to Claude Code policy-limits.json at %tool.real_file_path
   priority: CRITICAL
   source: coding_agent
-  tags: [coding_agent_deny, prempti_self_protection]
+  tags: [coding_agent_deny, prempti_self_protection, mitre_t1562.001_impair_defenses_disable_or_modify_tools]
 
 - rule: Ask before reading Claude Code settings file
   desc: >
@@ -2726,7 +2730,7 @@
     Falco requires confirmation to read Claude Code settings at %tool.real_file_path
   priority: WARNING
   source: coding_agent
-  tags: [coding_agent_ask, prempti_self_protection]
+  tags: [coding_agent_ask, prempti_self_protection, mitre_t1562.001_impair_defenses_disable_or_modify_tools]
 
 # Copilot CLI self-protection rules
 
