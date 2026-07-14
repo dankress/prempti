@@ -131,23 +131,6 @@ pub enum RemoveResult {
     NotFound,
 }
 
-/// Whether the Copilot JSON hook is currently registered in `~/.copilot/hooks/prempti.json`.
-/// Distinct from `is_enabled` (the marker that records user intent): the
-/// supervisor removes the JSON on service stop but keeps the marker, so
-/// across a stop/start window `is_registered` may be false even when
-/// `is_enabled` is true.
-pub fn is_registered() -> bool {
-    let path = copilot_hooks_path();
-    if !path.exists() {
-        return false;
-    }
-    fs::read_to_string(&path)
-        .ok()
-        .and_then(|data| serde_json::from_str::<serde_json::Value>(&data).ok())
-        .map(|settings| has_owned_copilot_interceptor_hook(&settings))
-        .unwrap_or(false)
-}
-
 /// Build the hook entry JSON object for a single hook registration.
 fn hook_entry(hook_cmd: &str) -> serde_json::Value {
     json!({
@@ -231,22 +214,30 @@ fn ensure_event_hook(
     true
 }
 
-fn has_owned_copilot_interceptor_hook(settings: &serde_json::Value) -> bool {
-    let Some(hooks) = settings.get("hooks").and_then(|h| h.as_object()) else {
-        return false;
+/// Owned interceptor commands registered under a single event
+/// (`hooks.<event>[]`). Empty when the event isn't present or holds
+/// only foreign hooks.
+fn owned_commands_for_event(
+    settings: &serde_json::Value,
+    event: &str,
+    expected: &str,
+) -> Vec<String> {
+    let mut out = Vec::new();
+    let Some(arr) = settings
+        .get("hooks")
+        .and_then(|h| h.get(event))
+        .and_then(|p| p.as_array())
+    else {
+        return out;
     };
-    for event in COPILOT_EVENTS {
-        if let Some(event_arr) = hooks.get(*event).and_then(|p| p.as_array()) {
-            for hook in event_arr {
-                if let Some(cmd) = hook.get("command").and_then(|c| c.as_str()) {
-                    if is_owned_copilot_interceptor_command(cmd, "") {
-                        return true;
-                    }
-                }
+    for hook in arr {
+        if let Some(cmd) = hook.get("command").and_then(|c| c.as_str()) {
+            if is_owned_copilot_interceptor_command(cmd, expected) {
+                out.push(cmd.to_string());
             }
         }
     }
-    false
+    out
 }
 
 pub fn remove(prefix: &Path) -> Result<RemoveResult, String> {
@@ -340,6 +331,9 @@ pub fn cli_add(prefix: &Path) {
         }
         Ok(AddResult::AlreadyRegistered) => {
             println!("Copilot hook already registered.");
+            // Ensure the marker exists even if the JSON was already there —
+            // covers the case of a stale install where the marker was
+            // missed.
             if let Err(e) = mark_enabled(prefix) {
                 eprintln!("warning: failed to record enable marker: {e}");
             }
@@ -370,17 +364,79 @@ pub fn cli_remove(prefix: &Path) {
 }
 
 pub fn cli_status(prefix: &Path) {
-    let registered = is_registered();
+    let path = copilot_hooks_path();
     let enabled = is_enabled(prefix);
-    match (registered, enabled) {
-        (true, true) => println!("Copilot hook: registered, supervisor-managed."),
-        (true, false) => println!(
-            "Copilot hook: registered (no enable marker — supervisor will not re-assert across restarts)."
-        ),
-        (false, true) => println!(
-            "Copilot hook: enabled marker present but JSON missing (expected briefly between supervisor stop and next start)."
-        ),
-        (false, false) => println!("Copilot hook: not registered."),
+
+    if !path.exists() {
+        if enabled {
+            println!(
+                "Copilot hook: enable marker present but {} is missing (expected briefly between supervisor stop and next start).",
+                path.display()
+            );
+        } else {
+            println!("Copilot hook: not registered.");
+        }
+        return;
+    }
+
+    let settings: serde_json::Value = match fs::read_to_string(&path) {
+        Ok(data) => match serde_json::from_str(&data) {
+            Ok(v) => v,
+            Err(e) => {
+                println!("Copilot hook: {} is not valid JSON ({e}).", path.display());
+                return;
+            }
+        },
+        Err(e) => {
+            println!("Copilot hook: cannot read {} ({e}).", path.display());
+            return;
+        }
+    };
+
+    let expected = interceptor_command(prefix);
+    let pre = owned_commands_for_event(&settings, "preToolUse", &expected);
+    let pr = owned_commands_for_event(&settings, "permissionRequest", &expected);
+
+    if pre.is_empty() && pr.is_empty() {
+        println!(
+            "Copilot hook: not registered (no Prempti interceptor in {}).",
+            path.display()
+        );
+        return;
+    }
+
+    let marker = if enabled {
+        "supervisor-managed"
+    } else {
+        "no enable marker — supervisor will not re-assert across restarts"
+    };
+    println!("Copilot hook: registered in {} ({marker}).", path.display());
+
+    for (event, cmds) in [("preToolUse", &pre), ("permissionRequest", &pr)] {
+        for cmd in cmds {
+            let missing = if Path::new(&crate::hook::expand_home(cmd)).exists() {
+                ""
+            } else {
+                "  [interceptor binary not found at this path]"
+            };
+            println!("    {event} → {cmd}{missing}");
+        }
+    }
+
+    // Copilot routes preToolUse and permissionRequest to the interceptor;
+    // a half-registered state silently lets one class of calls bypass policy.
+    if pre.is_empty() || pr.is_empty() {
+        let missing_event = if pre.is_empty() {
+            "preToolUse"
+        } else {
+            "permissionRequest"
+        };
+        println!(
+            "    WARNING: only one event is hooked — {missing_event} is missing. Run `premptictl hook add copilot` to repair."
+        );
+    }
+    if pre.iter().chain(pr.iter()).any(|c| c != &expected) {
+        println!("    note: a registered path differs from this install's prefix ({expected}).");
     }
 }
 
@@ -554,10 +610,61 @@ mod tests {
         );
     }
 
-    // ----- is_registered ---------------------------------------------
+    // ----- owned_commands_for_event ----------------------------------
 
     #[test]
-    fn is_registered_returns_true_when_hook_present() {
+    fn owned_commands_for_event_detects_owned_hook() {
+        let settings = json!({
+            "hooks": {
+                "preToolUse": [{"matcher": ".*", "type": "command", "command": "$HOME/.prempti/bin/copilot-interceptor", "timeoutSec": 30}]
+            }
+        });
+        let result = owned_commands_for_event(&settings, "preToolUse", "");
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], "$HOME/.prempti/bin/copilot-interceptor");
+    }
+
+    #[test]
+    fn owned_commands_for_event_ignores_user_hooks() {
+        let settings = json!({
+            "hooks": {
+                "preToolUse": [{"matcher": ".*", "type": "command", "command": "python my-copilot-interceptor.py", "timeoutSec": 30}]
+            }
+        });
+        let result = owned_commands_for_event(&settings, "preToolUse", "");
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn owned_commands_for_event_returns_empty_for_absent_event() {
+        let settings = json!({"hooks": {}});
+        let result = owned_commands_for_event(&settings, "preToolUse", "");
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn owned_commands_for_event_returns_empty_for_absent_hooks() {
+        let settings = json!({});
+        let result = owned_commands_for_event(&settings, "preToolUse", "");
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn owned_commands_for_event_detects_owned_hook_with_custom_prefix() {
+        let settings = json!({
+            "hooks": {
+                "permissionRequest": [{"matcher": ".*", "type": "command", "command": "/opt/prempti/bin/copilot-interceptor", "timeoutSec": 30}]
+            }
+        });
+        let result = owned_commands_for_event(&settings, "permissionRequest", "");
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], "/opt/prempti/bin/copilot-interceptor");
+    }
+
+    // ----- cli_status end-to-end -------------------------------------
+
+    #[test]
+    fn cli_status_detects_owned_hook_in_config_file() {
         let path = copilot_hooks_path();
         let temp_path = path.clone();
         let _ = fs::create_dir_all(temp_path.parent().unwrap());
@@ -570,14 +677,19 @@ mod tests {
         }"#;
         fs::write(&temp_path, data).unwrap();
 
-        assert!(is_registered(), "should detect our hook in prempti.json");
+        let settings = serde_json::from_str::<serde_json::Value>(data).unwrap();
+        let expected = "$HOME/.prempti/bin/copilot-interceptor";
+        let pre = owned_commands_for_event(&settings, "preToolUse", expected);
+        let pr = owned_commands_for_event(&settings, "permissionRequest", expected);
+        assert_eq!(pre.len(), 1);
+        assert_eq!(pr.len(), 1);
 
         // Cleanup
         let _ = fs::remove_file(temp_path);
     }
 
     #[test]
-    fn is_registered_returns_false_when_no_hook() {
+    fn cli_status_ignores_foreign_hooks_in_config_file() {
         let path = copilot_hooks_path();
         let temp_path = path.clone();
         let _ = fs::create_dir_all(temp_path.parent().unwrap());
@@ -589,7 +701,11 @@ mod tests {
         }"#;
         fs::write(&temp_path, data).unwrap();
 
-        assert!(!is_registered(), "should not detect other hooks as ours");
+        let settings = serde_json::from_str::<serde_json::Value>(data).unwrap();
+        let pre = owned_commands_for_event(&settings, "preToolUse", "");
+        let pr = owned_commands_for_event(&settings, "permissionRequest", "");
+        assert!(pre.is_empty());
+        assert!(pr.is_empty());
 
         // Cleanup
         let _ = fs::remove_file(temp_path);
