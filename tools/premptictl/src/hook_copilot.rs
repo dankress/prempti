@@ -712,4 +712,97 @@ mod tests {
         // Cleanup
         let _ = fs::remove_file(temp_path);
     }
+
+    // ----- enable marker lifecycle -----------------------------------
+
+    fn temp_prefix(label: &str) -> PathBuf {
+        let p = std::env::temp_dir().join(format!(
+            "prempti-hookcopilot-{}-{}-{}",
+            std::process::id(),
+            label,
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let _ = fs::remove_dir_all(&p);
+        p
+    }
+
+    #[test]
+    fn enable_marker_path_is_under_config_dir() {
+        let prefix = PathBuf::from("/some/install");
+        let m = enable_marker_path(&prefix);
+        assert_eq!(m, PathBuf::from("/some/install/config/copilot-hook-enabled"));
+    }
+
+    #[test]
+    fn is_enabled_false_when_prefix_missing() {
+        let prefix = temp_prefix("absent");
+        // Prefix dir doesn't exist; nothing to read.
+        assert!(!is_enabled(&prefix));
+    }
+
+    #[test]
+    fn mark_enabled_then_is_enabled_returns_true() {
+        let prefix = temp_prefix("mark-enable");
+        mark_enabled(&prefix).expect("mark_enabled");
+        assert!(is_enabled(&prefix));
+        // Cleanup.
+        let _ = fs::remove_dir_all(&prefix);
+    }
+
+    #[test]
+    fn mark_disabled_then_is_enabled_returns_false() {
+        let prefix = temp_prefix("mark-disable");
+        mark_enabled(&prefix).expect("mark_enabled");
+        assert!(is_enabled(&prefix));
+        mark_disabled(&prefix).expect("mark_disabled");
+        assert!(!is_enabled(&prefix));
+        let _ = fs::remove_dir_all(&prefix);
+    }
+
+    #[test]
+    fn mark_disabled_is_idempotent_when_marker_absent() {
+        let prefix = temp_prefix("disable-absent");
+        // Never enabled; disabling should still succeed (no-op).
+        mark_disabled(&prefix).expect("idempotent disable");
+        assert!(!is_enabled(&prefix));
+    }
+
+    // ----- add recovers partial registration state -------------------
+
+    #[test]
+    fn add_recovers_partial_registration_state() {
+        // Half-registered: preToolUse has our hook, permissionRequest doesn't.
+        // add() should add the missing half without disturbing the present one.
+        let path = copilot_hooks_path();
+        let temp_path = path.clone();
+        let _ = fs::create_dir_all(temp_path.parent().unwrap());
+        let data = r#"{
+            "version": 1,
+            "hooks": {
+                "preToolUse": [{"matcher": ".*", "type": "command", "command": "$HOME/.prempti/bin/copilot-interceptor", "timeoutSec": 30}]
+            }
+        }"#;
+        fs::write(&temp_path, data).unwrap();
+
+        let prefix = PathBuf::from("$HOME/.prempti");
+        let result = add(&prefix);
+        assert!(matches!(result, Ok(AddResult::Added(_))));
+
+        let settings: serde_json::Value = serde_json::from_str(&fs::read_to_string(&temp_path).unwrap()).unwrap();
+        // preToolUse should still have exactly one entry.
+        assert_eq!(settings["hooks"]["preToolUse"].as_array().unwrap().len(), 1);
+        // permissionRequest should now have our hook.
+        assert!(settings["hooks"]["permissionRequest"].is_array());
+        assert_eq!(settings["hooks"]["permissionRequest"].as_array().unwrap().len(), 1);
+        assert_eq!(
+            settings["hooks"]["permissionRequest"][0]["command"].as_str().unwrap(),
+            "$HOME/.prempti/bin/copilot-interceptor"
+        );
+
+        // Cleanup
+        let _ = fs::remove_file(temp_path);
+    }
 }
