@@ -737,8 +737,10 @@
 # Macros — Bash threat detection
 
 - macro: is_bash
-  condition: tool.name = "Bash"
   condition: tool.name in ("Bash", "bash")
+
+- macro: is_powershell
+  condition: tool.name = "powershell"
 
 - macro: references_credential
   condition: >
@@ -1766,7 +1768,7 @@
   desc: >
     Blocks PowerShell commands that pipe network-fetched or generated
     content directly into a shell interpreter.
-  condition: is_bash and is_psh_pipe_to_shell
+  condition: is_powershell and is_psh_pipe_to_shell
   output: >
     Falco blocked PowerShell pipe to shell interpreter (%tool.input_command)
   priority: CRITICAL
@@ -1776,7 +1778,7 @@
 - rule: Deny PowerShell encoded payload execution
   desc: >
     Blocks PowerShell commands that decode and execute encoded payloads.
-  condition: is_bash and is_psh_encoded_exec
+  condition: is_powershell and is_psh_encoded_exec
   output: >
     Falco blocked PowerShell encoded payload execution (%tool.input_command)
   priority: CRITICAL
@@ -1786,7 +1788,7 @@
 - rule: Deny PowerShell credential access
   desc: >
     Blocks PowerShell commands that access credentials.
-  condition: is_bash and is_psh_credential_access
+  condition: is_powershell and is_psh_credential_access
   output: >
     Falco blocked PowerShell credential access (%tool.input_command)
   priority: CRITICAL
@@ -1796,7 +1798,7 @@
 - rule: Deny PowerShell cloud metadata access
   desc: >
     Blocks PowerShell commands that access cloud instance metadata endpoints.
-  condition: is_bash and is_psh_imds
+  condition: is_powershell and is_psh_imds
   output: >
     Falco blocked PowerShell cloud metadata access (%tool.input_command)
   priority: CRITICAL
@@ -1807,7 +1809,7 @@
   desc: >
     Blocks PowerShell commands that spawn processes with hidden or
     no-new-window flags.
-  condition: is_bash and is_psh_sandbox_escape
+  condition: is_powershell and is_psh_sandbox_escape
   output: >
     Falco blocked PowerShell sandbox escape attempt (%tool.input_command)
   priority: CRITICAL
