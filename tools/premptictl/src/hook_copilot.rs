@@ -461,16 +461,15 @@ mod tests {
         let hook_cmd = "$HOME/.prempti/bin/copilot-interceptor";
         let entry = hook_entry(hook_cmd);
 
-        let mut hooks = json!({});
-        let added_pre = ensure_event_hook(&mut hooks, "preToolUse", &entry);
-        let added_perm = ensure_event_hook(&mut hooks, "permissionRequest", &entry);
+        let added_pre = ensure_event_hook(&mut settings, "preToolUse", &entry);
+        let added_perm = ensure_event_hook(&mut settings, "permissionRequest", &entry);
 
         assert!(added_pre);
         assert!(added_perm);
-        assert!(hooks["preToolUse"].is_array());
-        assert!(hooks["permissionRequest"].is_array());
-        assert_eq!(hooks["preToolUse"].as_array().unwrap().len(), 1);
-        assert_eq!(hooks["permissionRequest"].as_array().unwrap().len(), 1);
+        assert!(settings["preToolUse"].is_array());
+        assert!(settings["permissionRequest"].is_array());
+        assert_eq!(settings["preToolUse"].as_array().unwrap().len(), 1);
+        assert_eq!(settings["permissionRequest"].as_array().unwrap().len(), 1);
     }
 
     #[test]
@@ -484,14 +483,13 @@ mod tests {
                 "permissionRequest": [entry.clone()]
             }
         });
-        let hooks = settings["hooks"].take();
         let added_pre = ensure_event_hook(
-            settings["hooks"].as_object_mut().unwrap(),
+            &mut settings["hooks"],
             "preToolUse",
             &entry
         );
         let added_perm = ensure_event_hook(
-            settings["hooks"].as_object_mut().unwrap(),
+            &mut settings["hooks"],
             "permissionRequest",
             &entry
         );
@@ -514,7 +512,7 @@ mod tests {
         let hook_cmd = "$HOME/.prempti/bin/copilot-interceptor";
         let entry = hook_entry(hook_cmd);
         let added = ensure_event_hook(
-            settings["hooks"].as_object_mut().unwrap(),
+            &mut settings["hooks"],
             "preToolUse",
             &entry
         );
@@ -568,10 +566,10 @@ mod tests {
         });
         let removed = strip_owned_hooks(&mut settings, hook_cmd);
         assert!(removed);
-        let hooks = settings["hooks"].as_object().unwrap();
-        assert!(!hooks.contains_key("preToolUse"), "preToolUse should be removed");
-        assert!(!hooks.contains_key("permissionRequest"), "permissionRequest should be removed");
-        assert!(hooks.is_empty(), "hooks object should be empty");
+        assert!(
+            settings.get("hooks").is_none(),
+            "both events should be empty: {settings}"
+        );
     }
 
     // ----- is_registered ---------------------------------------------
