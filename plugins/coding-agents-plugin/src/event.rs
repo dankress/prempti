@@ -388,8 +388,6 @@ fn extract_command(tool_name: &str, tool_input: &serde_json::Value) -> String {
 }
 
 /// Extract the raw file_path from tool_input.
-/// Claude Code: Write/Edit/Read use "file_path".
-/// Codex: Write/Edit use "file_path"; apply_patch uses injected patch_path.
 /// Copilot CLI: create/view use "path"; edit uses "file_path".
 fn extract_raw_file_path(tool_name: &str, tool_input: &serde_json::Value) -> String {
     if !matches!(
@@ -398,8 +396,6 @@ fn extract_raw_file_path(tool_name: &str, tool_input: &serde_json::Value) -> Str
     ) {
         return String::new();
     }
-    // Copilot's create/view use "path"; Copilot's edit and Claude/Codex use
-    // "file_path". Try both so all agents get path fields populated.
     tool_input
         .get("file_path")
         .or_else(|| tool_input.get("path"))
