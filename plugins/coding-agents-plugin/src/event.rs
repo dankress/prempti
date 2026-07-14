@@ -376,7 +376,8 @@ impl ParsedEvent {
 // ---------------------------------------------------------------------------
 
 fn extract_command(tool_name: &str, tool_input: &serde_json::Value) -> String {
-    if tool_name != "Bash" {
+    // Claude Code: "Bash"; Copilot CLI: "bash" / "powershell"
+    if !matches!(tool_name, "Bash" | "bash" | "powershell") {
         return String::new();
     }
     tool_input
@@ -386,13 +387,22 @@ fn extract_command(tool_name: &str, tool_input: &serde_json::Value) -> String {
         .to_string()
 }
 
-/// Extract the raw file_path from tool_input (Write/Edit/Read only).
+/// Extract the raw file_path from tool_input.
+/// Claude Code: Write/Edit/Read use "file_path".
+/// Codex: Write/Edit use "file_path"; apply_patch uses injected patch_path.
+/// Copilot CLI: create/view use "path"; edit uses "file_path".
 fn extract_raw_file_path(tool_name: &str, tool_input: &serde_json::Value) -> String {
-    if !matches!(tool_name, "Write" | "Edit" | "Read") {
+    if !matches!(
+        tool_name,
+        "Write" | "Edit" | "Read" | "create" | "edit" | "view"
+    ) {
         return String::new();
     }
+    // Copilot's create/view use "path"; Copilot's edit and Claude/Codex use
+    // "file_path". Try both so all agents get path fields populated.
     tool_input
         .get("file_path")
+        .or_else(|| tool_input.get("path"))
         .and_then(|v| v.as_str())
         .unwrap_or("")
         .to_string()
