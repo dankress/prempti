@@ -132,12 +132,6 @@
     or tool.real_file_path contains "/.docker/"
     or basename(tool.file_path) in (sensitive_file_names)
 
-# Copilot CLI data path macro — suppresses generic outside-cwd ASK across
-# the whole Copilot tree so the agent can manage its own state without
-# prompting. Sensitive subpaths are guarded by independent rules.
-- macro: is_copilot_data_path
-  condition: tool.real_file_path contains "/.copilot/"
-
 - macro: is_outside_cwd
   condition: not tool.real_file_path startswith val(agent.real_cwd)
 
@@ -154,6 +148,12 @@
 #   ASK    — commands/, CLAUDE.md, agents/, skills/, plugins/, backups/
 - macro: is_claude_data_path
   condition: tool.real_file_path contains "/.claude/"
+
+# Copilot CLI data path macro, suppresses generic outside-cwd ASK across
+# the whole Copilot tree so the agent can manage its own state without
+# prompting. Sensitive subpaths are guarded by independent rules.
+- macro: is_copilot_data_path
+  condition: tool.real_file_path contains "/.copilot/"
 
 # IOC hosting domains observed in the ClawHavoc campaign (341 malicious skills,
 # 2024-2025) and similar AI-supply-chain attacks. Inlined into the macros below
